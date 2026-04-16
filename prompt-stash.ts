@@ -276,7 +276,7 @@ export default function (pi: ExtensionAPI) {
 					render: (w: number) => container.render(w),
 					invalidate: () => { container.invalidate(); rebuild(); },
 					handleInput: (data: string) => {
-						if (matchesKey(data, Key.escape) || matchesKey(data, Key.ctrl("c"))) {
+						if (matchesKey(data, Key.escape) || matchesKey(data, Key.ctrl("c")) || matchesKey(data, config.stash)) {
 							done(null);
 						} else if (entries.length === 0) {
 							return;
