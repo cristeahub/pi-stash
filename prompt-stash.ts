@@ -6,27 +6,38 @@
  *   Ctrl+Shift+Q       — stash with a message
  *
  * Commands:
- *   /stash             — list all stashes
- *   /stash list        — list all stashes
+ *   /stash             — interactive stash picker
+ *   /stash list        — interactive stash picker
  *   /stash pop         — pick a stash, paste into editor, remove it
  *   /stash apply       — pick a stash, paste into editor, keep it
  *   /stash drop        — pick a stash and delete it
  *   /stash clear       — drop every stash
+ *
+ * Stash picker keys:
+ *   j/k or ↑/↓         — move up/down
+ *   Enter               — apply or pop (configurable)
+ *   a                   — apply (paste, keep stash)
+ *   p                   — pop (paste, remove stash)
+ *   d                   — drop (delete without pasting)
+ *   Esc                 — close
  *
  * Stashes persist in ~/.pi/stash.json across sessions.
  *
  * Config (~/.pi/stash-config.json):
  *   {
  *     "stash": "ctrl+q",
- *     "stashWithMessage": "ctrl+shift+q"
+ *     "stashWithMessage": "ctrl+shift+q",
+ *     "enterAction": "apply"
  *   }
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, Theme } from "@mariozechner/pi-coding-agent";
+import { DynamicBorder } from "@mariozechner/pi-coding-agent";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { homedir } from "node:os";
+import { matchesKey, Key, truncateToWidth, Container, Text } from "@mariozechner/pi-tui";
 
 // ── Types ───────────────────────────────────────────────────
 
@@ -45,6 +56,13 @@ interface StashStore {
 interface StashConfig {
 	stash: string;
 	stashWithMessage: string;
+	enterAction: "apply" | "pop";
+}
+
+type PickerAction = "apply" | "pop" | "drop";
+interface PickerResult {
+	index: number;
+	action: PickerAction;
 }
 
 // ── Paths & defaults ────────────────────────────────────────
@@ -56,6 +74,7 @@ const CONFIG_FILE = `${HOME}/.pi/stash-config.json`;
 const DEFAULT_CONFIG: StashConfig = {
 	stash: "ctrl+q",
 	stashWithMessage: "ctrl+shift+q",
+	enterAction: "apply",
 };
 
 // ── Config (sync — needed at extension load time) ───────────
@@ -88,7 +107,12 @@ async function saveStore(store: StashStore): Promise<void> {
 
 // ── Formatting ──────────────────────────────────────────────
 
-function formatStashLabel(entry: StashEntry, index: number): string {
+function formatStashLine(
+	entry: StashEntry,
+	index: number,
+	selected: boolean,
+	theme: Theme,
+): string {
 	const date = new Date(entry.timestamp);
 	const ts = date.toLocaleString("en-GB", {
 		day: "2-digit",
@@ -96,9 +120,17 @@ function formatStashLabel(entry: StashEntry, index: number): string {
 		hour: "2-digit",
 		minute: "2-digit",
 	});
-	const preview = entry.text.replace(/\n/g, " ").slice(0, 60);
+	const ref = `stash@{${index}}`;
 	const msg = entry.message ? `: ${entry.message}` : "";
-	return `stash@{${index}}${msg} — ${ts} — ${preview}${entry.text.length > 60 ? "…" : ""}`;
+	const preview = entry.text.replace(/\n/g, "↵ ").slice(0, 50);
+
+	const pointer = selected ? theme.fg("accent", "❯ ") : "  ";
+	const refStyled = selected ? theme.fg("accent", ref) : theme.fg("muted", ref);
+	const msgStyled = selected ? theme.fg("text", msg) : theme.fg("dim", msg);
+	const tsStyled = theme.fg("dim", ts);
+	const previewStyled = theme.fg("dim", preview + (entry.text.length > 50 ? "…" : ""));
+
+	return `${pointer}${refStyled}${msgStyled}  ${tsStyled}  ${previewStyled}`;
 }
 
 // ── Extension ───────────────────────────────────────────────
@@ -119,7 +151,7 @@ export default function (pi: ExtensionAPI) {
 
 	// ── /stash command ──────────────────────────────────────
 	pi.registerCommand("stash", {
-		description: "List stashes. Sub-commands: pop, apply, drop, clear",
+		description: "Interactive stash picker. Sub-commands: pop, apply, drop, clear",
 		getArgumentCompletions: (prefix: string) => {
 			const subs = ["list", "pop", "apply", "drop", "clear"];
 			const filtered = subs
@@ -130,9 +162,9 @@ export default function (pi: ExtensionAPI) {
 		handler: async (args, ctx) => {
 			const trimmed = args.trim();
 
-			if (trimmed === "" || trimmed === "list") return listStashes(ctx);
-			if (trimmed === "pop") return pickStash(ctx, true);
-			if (trimmed === "apply") return pickStash(ctx, false);
+			if (trimmed === "" || trimmed === "list") return openPicker(ctx);
+			if (trimmed === "pop") return openPicker(ctx, "pop");
+			if (trimmed === "apply") return openPicker(ctx, "apply");
 			if (trimmed === "drop") return dropStash(ctx);
 			if (trimmed === "clear") return clearStashes(ctx);
 
@@ -152,7 +184,7 @@ export default function (pi: ExtensionAPI) {
 		let message = "";
 		if (promptForMessage) {
 			const input = await ctx.ui.input("Stash message:", "");
-			if (input == null) return; // cancelled
+			if (input == null) return;
 			message = input.trim();
 		}
 
@@ -173,49 +205,91 @@ export default function (pi: ExtensionAPI) {
 		);
 	}
 
-	async function listStashes(ctx: any) {
+	async function openPicker(ctx: any, forceAction?: PickerAction) {
 		const store = await loadStore();
 		if (store.entries.length === 0) {
 			ctx.ui.notify("No stashes.", "info");
 			return;
 		}
-		const lines = store.entries.map((e: StashEntry, i: number) =>
-			formatStashLabel(e, i),
+
+		const result = await ctx.ui.custom<PickerResult | null>(
+			(tui: any, theme: Theme, _kb: any, done: (r: PickerResult | null) => void) => {
+				let selected = 0;
+				const entries = store.entries;
+
+				const container = new Container();
+				const topBorder = new DynamicBorder((s: string) => theme.fg("accent", s));
+				const title = new Text("", 1, 0);
+				const list = new Text("", 1, 0);
+				const help = new Text("", 1, 0);
+				const bottomBorder = new DynamicBorder((s: string) => theme.fg("accent", s));
+
+				container.addChild(topBorder);
+				container.addChild(title);
+				container.addChild(list);
+				container.addChild(help);
+				container.addChild(bottomBorder);
+
+				const enterLabel = config.enterAction === "pop" ? "pop" : "apply";
+
+				function rebuild() {
+					title.setText(theme.fg("accent", theme.bold(" Stashes")) + theme.fg("dim", ` (${entries.length})`));
+
+					const lines = entries.map((e, i) =>
+						formatStashLine(e, i, i === selected, theme),
+					);
+					list.setText(lines.join("\n"));
+
+					const hints = forceAction
+						? `enter ${forceAction} • esc cancel`
+						: `enter ${enterLabel} • a apply • p pop • d drop • j/k ↑/↓ navigate • esc close`;
+					help.setText(theme.fg("dim", ` ${hints}`));
+				}
+
+				rebuild();
+
+				return {
+					render: (w: number) => container.render(w),
+					invalidate: () => { container.invalidate(); rebuild(); },
+					handleInput: (data: string) => {
+						if (matchesKey(data, Key.escape) || matchesKey(data, Key.ctrl("c"))) {
+							done(null);
+						} else if (matchesKey(data, Key.up) || data === "k") {
+							if (selected > 0) { selected--; rebuild(); tui.requestRender(); }
+						} else if (matchesKey(data, Key.down) || data === "j") {
+							if (selected < entries.length - 1) { selected++; rebuild(); tui.requestRender(); }
+						} else if (matchesKey(data, Key.enter)) {
+							done({ index: selected, action: forceAction ?? config.enterAction });
+						} else if (!forceAction && data === "a") {
+							done({ index: selected, action: "apply" });
+						} else if (!forceAction && data === "p") {
+							done({ index: selected, action: "pop" });
+						} else if (!forceAction && data === "d") {
+							done({ index: selected, action: "drop" });
+						}
+					},
+				};
+			},
 		);
-		await ctx.ui.select("Stash list (Esc to close):", lines);
-	}
 
-	async function pickStash(ctx: any, remove: boolean) {
-		const store = await loadStore();
-		if (store.entries.length === 0) {
-			ctx.ui.notify("No stashes to " + (remove ? "pop" : "apply") + ".", "info");
-			return;
-		}
+		if (!result) return;
 
-		const labels = store.entries.map((e: StashEntry, i: number) =>
-			formatStashLabel(e, i),
-		);
-		const picked = await ctx.ui.select(
-			remove ? "Pop stash (select & remove):" : "Apply stash (select & keep):",
-			labels,
-		);
-		if (picked == null) return;
+		const entry = store.entries[result.index];
+		const ref = `stash@{${result.index}}${entry.message ? `: ${entry.message}` : ""}`;
 
-		const index = labels.indexOf(picked);
-		if (index === -1) return;
-
-		const entry = store.entries[index];
-		ctx.ui.setEditorText?.(entry.text);
-
-		if (remove) {
-			store.entries.splice(index, 1);
+		if (result.action === "apply") {
+			ctx.ui.setEditorText?.(entry.text);
+			ctx.ui.notify(`Applied ${ref}`, "info");
+		} else if (result.action === "pop") {
+			ctx.ui.setEditorText?.(entry.text);
+			store.entries.splice(result.index, 1);
 			await saveStore(store);
+			ctx.ui.notify(`Popped ${ref}`, "info");
+		} else if (result.action === "drop") {
+			store.entries.splice(result.index, 1);
+			await saveStore(store);
+			ctx.ui.notify(`Dropped ${ref}`, "info");
 		}
-
-		ctx.ui.notify(
-			`${remove ? "Popped" : "Applied"} stash@{${index}}${entry.message ? `: ${entry.message}` : ""}`,
-			"info",
-		);
 	}
 
 	async function dropStash(ctx: any) {
@@ -224,23 +298,7 @@ export default function (pi: ExtensionAPI) {
 			ctx.ui.notify("No stashes to drop.", "info");
 			return;
 		}
-
-		const labels = store.entries.map((e: StashEntry, i: number) =>
-			formatStashLabel(e, i),
-		);
-		const picked = await ctx.ui.select("Drop stash (select & delete):", labels);
-		if (picked == null) return;
-
-		const index = labels.indexOf(picked);
-		if (index === -1) return;
-
-		const entry = store.entries[index];
-		store.entries.splice(index, 1);
-		await saveStore(store);
-		ctx.ui.notify(
-			`Dropped stash@{${index}}${entry.message ? `: ${entry.message}` : ""}`,
-			"info",
-		);
+		return openPicker(ctx, "drop");
 	}
 
 	async function clearStashes(ctx: any) {

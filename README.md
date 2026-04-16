@@ -33,23 +33,42 @@ Then `/reload` in pi.
 
 | Command | Action |
 |---------|--------|
-| `/stash` | List all stashes |
-| `/stash list` | List all stashes |
-| `/stash pop` | Select a stash → paste into editor, remove from stash |
-| `/stash apply` | Select a stash → paste into editor, keep in stash |
-| `/stash drop` | Select a stash and delete it |
+| `/stash` | Interactive stash picker |
+| `/stash list` | Interactive stash picker |
+| `/stash pop` | Picker locked to pop mode |
+| `/stash apply` | Picker locked to apply mode |
+| `/stash drop` | Picker locked to drop mode |
 | `/stash clear` | Drop all stashes (with confirmation) |
+
+### Picker Keys
+
+| Key | Action |
+|-----|--------|
+| `j` / `↓` | Move down |
+| `k` / `↑` | Move up |
+| `Enter` | Apply or pop (configurable, default: apply) |
+| `a` | Apply — paste into editor, keep stash |
+| `p` | Pop — paste into editor, remove stash |
+| `d` | Drop — delete stash without pasting |
+| `Esc` | Close picker |
 
 ## Configuration
 
-Keybindings are configurable via `~/.pi/stash-config.json`:
+All settings in `~/.pi/stash-config.json`:
 
 ```json
 {
   "stash": "ctrl+q",
-  "stashWithMessage": "ctrl+shift+q"
+  "stashWithMessage": "ctrl+shift+q",
+  "enterAction": "apply"
 }
 ```
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `stash` | `ctrl+q` | Quick stash shortcut |
+| `stashWithMessage` | `ctrl+shift+q` | Stash with message shortcut |
+| `enterAction` | `"apply"` | What Enter does in the picker: `"apply"` or `"pop"` |
 
 Only include keys you want to override. `/reload` after editing.
 
