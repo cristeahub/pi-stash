@@ -1,0 +1,42 @@
+{
+  "name": "@ctogg/pi-stash",
+  "version": "0.1.0",
+  "description": "Git-style prompt stashing for pi — save what you're typing, clear the editor, and come back to it later.",
+  "type": "module",
+  "keywords": [
+    "pi",
+    "pi-package",
+    "pi-extension",
+    "stash",
+    "prompt"
+  ],
+  "license": "MIT",
+  "author": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cristeahub/pi-stash.git"
+  },
+  "homepage": "https://github.com/cristeahub/pi-stash#readme",
+  "bugs": {
+    "url": "https://github.com/cristeahub/pi-stash/issues"
+  },
+  "files": [
+    "prompt-stash.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "pi": {
+    "extensions": [
+      "./prompt-stash.ts"
+    ]
+  },
+  "scripts": {
+    "clean": "echo 'nothing to clean'",
+    "build": "echo 'nothing to build'",
+    "check": "echo 'nothing to check'"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*"
+  }
+}
