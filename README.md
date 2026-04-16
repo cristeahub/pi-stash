@@ -26,8 +26,8 @@ Then `/reload` in pi.
 
 | Key | Action |
 |-----|--------|
-| `Ctrl+S` | Stash current editor text |
-| `Ctrl+Alt+S` | Stash with a message |
+| `Ctrl+Q` | Stash current editor text |
+| `Ctrl+Shift+Q` | Stash with a message |
 
 ### Commands
 
@@ -46,8 +46,8 @@ Keybindings are configurable via `~/.pi/stash-config.json`:
 
 ```json
 {
-  "stash": "ctrl+s",
-  "stashWithMessage": "ctrl+alt+s"
+  "stash": "ctrl+q",
+  "stashWithMessage": "ctrl+shift+q"
 }
 ```
 

@@ -2,8 +2,8 @@
  * Prompt Stash — git-style stashing for your editor prompts.
  *
  * Shortcuts (configurable via ~/.pi/stash-config.json):
- *   Ctrl+S             — quick stash (no message)
- *   Ctrl+Alt+S         — stash with a message
+ *   Ctrl+Q             — quick stash (no message)
+ *   Ctrl+Shift+Q       — stash with a message
  *
  * Commands:
  *   /stash             — list all stashes
@@ -17,8 +17,8 @@
  *
  * Config (~/.pi/stash-config.json):
  *   {
- *     "stash": "ctrl+s",
- *     "stashWithMessage": "ctrl+alt+s"
+ *     "stash": "ctrl+q",
+ *     "stashWithMessage": "ctrl+shift+q"
  *   }
  */
 
@@ -54,8 +54,8 @@ const STASH_FILE = `${HOME}/.pi/stash.json`;
 const CONFIG_FILE = `${HOME}/.pi/stash-config.json`;
 
 const DEFAULT_CONFIG: StashConfig = {
-	stash: "ctrl+s",
-	stashWithMessage: "ctrl+alt+s",
+	stash: "ctrl+q",
+	stashWithMessage: "ctrl+shift+q",
 };
 
 // ── Config (sync — needed at extension load time) ───────────
