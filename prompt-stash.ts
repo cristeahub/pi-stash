@@ -140,8 +140,14 @@ export default function (pi: ExtensionAPI) {
 
 	// ── Shortcuts ───────────────────────────────────────────
 	pi.registerShortcut(config.stash, {
-		description: "Stash current editor text",
-		handler: async (ctx) => pushStash(ctx, false),
+		description: "Stash current editor text, or open picker if editor is empty",
+		handler: async (ctx) => {
+			const editorText = ctx.ui.getEditorText?.();
+			if (!editorText || editorText.trim().length === 0) {
+				return openPicker(ctx);
+			}
+			return pushStash(ctx, false);
+		},
 	});
 
 	pi.registerShortcut(config.stashWithMessage, {
