@@ -165,7 +165,7 @@ export default function (pi: ExtensionAPI) {
 			if (trimmed === "" || trimmed === "list") return openPicker(ctx);
 			if (trimmed === "pop") return openPicker(ctx, "pop");
 			if (trimmed === "apply") return openPicker(ctx, "apply");
-			if (trimmed === "drop") return dropStash(ctx);
+			if (trimmed === "drop") return openPicker(ctx, "drop");
 			if (trimmed === "clear") return clearStashes(ctx);
 
 			ctx.ui.notify(`Unknown sub-command: ${trimmed}`, "warning");
@@ -235,6 +235,12 @@ export default function (pi: ExtensionAPI) {
 				function rebuild() {
 					title.setText(theme.fg("accent", theme.bold(" Stashes")) + theme.fg("dim", ` (${entries.length})`));
 
+					if (entries.length === 0) {
+						list.setText(theme.fg("dim", "  No stashes."));
+						help.setText(theme.fg("dim", " esc close"));
+						return;
+					}
+
 					const lines = entries.map((e, i) =>
 						formatStashLine(e, i, i === selected, theme),
 					);
@@ -248,24 +254,39 @@ export default function (pi: ExtensionAPI) {
 
 				rebuild();
 
+				function dropSelected() {
+					if (entries.length === 0) return;
+					const entry = entries[selected];
+					const ref = `stash@{${selected}}${entry.message ? `: ${entry.message}` : ""}`;
+					entries.splice(selected, 1);
+					saveStore(store);
+					if (selected >= entries.length && selected > 0) selected--;
+					rebuild();
+					tui.requestRender();
+					ctx.ui.notify(`Dropped ${ref}`, "info");
+				}
+
 				return {
 					render: (w: number) => container.render(w),
 					invalidate: () => { container.invalidate(); rebuild(); },
 					handleInput: (data: string) => {
 						if (matchesKey(data, Key.escape) || matchesKey(data, Key.ctrl("c"))) {
 							done(null);
+						} else if (entries.length === 0) {
+							return;
 						} else if (matchesKey(data, Key.up) || data === "k") {
 							if (selected > 0) { selected--; rebuild(); tui.requestRender(); }
 						} else if (matchesKey(data, Key.down) || data === "j") {
 							if (selected < entries.length - 1) { selected++; rebuild(); tui.requestRender(); }
 						} else if (matchesKey(data, Key.enter)) {
+							if (forceAction === "drop") { dropSelected(); return; }
 							done({ index: selected, action: forceAction ?? config.enterAction });
 						} else if (!forceAction && data === "a") {
 							done({ index: selected, action: "apply" });
 						} else if (!forceAction && data === "p") {
 							done({ index: selected, action: "pop" });
-						} else if (!forceAction && data === "d") {
-							done({ index: selected, action: "drop" });
+						} else if (data === "d") {
+							dropSelected();
 						}
 					},
 				};
@@ -285,20 +306,7 @@ export default function (pi: ExtensionAPI) {
 			store.entries.splice(result.index, 1);
 			await saveStore(store);
 			ctx.ui.notify(`Popped ${ref}`, "info");
-		} else if (result.action === "drop") {
-			store.entries.splice(result.index, 1);
-			await saveStore(store);
-			ctx.ui.notify(`Dropped ${ref}`, "info");
 		}
-	}
-
-	async function dropStash(ctx: any) {
-		const store = await loadStore();
-		if (store.entries.length === 0) {
-			ctx.ui.notify("No stashes to drop.", "info");
-			return;
-		}
-		return openPicker(ctx, "drop");
 	}
 
 	async function clearStashes(ctx: any) {
