@@ -66,7 +66,7 @@ Make sure the npm-installed version is removed first (`pi remove npm:@ctogg/pi-s
 | `a`       | Apply — paste into editor, keep stash       |
 | `p`       | Pop — paste into editor, remove stash       |
 | `d`       | Drop — delete stash without pasting         |
-| `Esc`     | Close picker                                |
+| `Esc` / `Ctrl+Q` | Close picker                           |
 
 ## Configuration
 
