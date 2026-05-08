@@ -1,6 +1,6 @@
 {
   "name": "@ctogg/pi-stash",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Git-style prompt stashing for pi — save what you're typing, clear the editor, and come back to it later.",
   "type": "module",
   "keywords": [
