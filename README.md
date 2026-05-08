@@ -1,6 +1,6 @@
 # pi-stash
 
-Git-style prompt stashing for [pi](https://github.com/badlogic/pi-mono).
+Git-style prompt stashing for [pi](https://github.com/earendil-works/pi-mono).
 
 Save what you're typing, clear the editor, and come back to it later.
 

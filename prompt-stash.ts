@@ -31,13 +31,13 @@
  *   }
  */
 
-import type { ExtensionAPI, Theme } from "@mariozechner/pi-coding-agent";
-import { DynamicBorder } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
+import { DynamicBorder } from "@earendil-works/pi-coding-agent";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { homedir } from "node:os";
-import { matchesKey, Key, truncateToWidth, Container, Text } from "@mariozechner/pi-tui";
+import { matchesKey, Key, truncateToWidth, Container, Text } from "@earendil-works/pi-tui";
 
 // ── Types ───────────────────────────────────────────────────
 
